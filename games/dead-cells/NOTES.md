@@ -220,3 +220,19 @@ Root causes found in bytecode:
   fa4e226c...). Draft PR to coop-anything: cranebeaker/coop-anything#237.
 - Build note: the MDK's props read an MSBuild property named DCCM_ROOT, so an environment variable with that name
   breaks the build (every DCCM type "not found"). build.sh now takes DCCM_DIR.
+
+## v0.9.0 (owner request, not played yet; verified on PC, sha256 65794981...)
+- Mod UI is possible on DCCM: DCCM's own "MOD" badge and Options > Core Modding page are built from the game's UI
+  pieces. A mod implementing ModCore.Menu.IModMenu (GetName/GetSubText/BuildMenu(dc.ui.Options)) gets its own page under
+  Core Modding; Options.addSimpleWidget / addToggleWidget / addSeparator build it. Present in DCCM 35.14.1 (the owner's
+  ModCore.dll is byte-identical to the MDK's).
+- Overlays are drawn without a ui.Process subclass: an h2d.Object added to Main.ME.root at Const.ROOT_DP_MENU,
+  text from Assets.makeText(str, color, big, parent), a dark h2d.Graphics rectangle, button icons from
+  ui.ControlIcon.setKey(MainKey.MK_Gamepad(padKey)). Assets.getControlId maps all 28 pad keys (L3 = Btn_LeftStick) and
+  picks the icon style from the controller's name. While open: Game.pause()/resume() (only if not already paused) and an
+  exclusive ControllerAccess on both controllers; the screen reads the GamePads directly.
+- Screens: "Choose your side" (each controller starts in the middle, stick/d-pad left = P1, right = P2, A confirms,
+  B undoes/back; saved as SwapPads + SidesChosen), opens on the first co-op run and with Back+Start (was: instant swap);
+  "Co-op controls" (L3 regroup, Back+Start, P2 Start, P1 Back map, revive, loot, keys, F9/F10); Options page with both
+  plus toggles (shared camera, keep on screen, loot for both, hide minimap). Text only; controller art later.
+- Layout positions are in window pixels and untested in game; expect a tuning pass from screenshots.
