@@ -6,14 +6,15 @@
 | Versions tested | Steam, game version 35 ("The End is Near"), build 2023-10-01, `deadcells.exe` SHA-256 `6778a6cf685a0f5962dd880af7e7ab6dbd848b5cd32daab6a8a8a6078534a7a1`; Windows x64; DCCM 35.14.1 |
 | Projects | [Dead Cells Local Co-op](https://github.com/Osman-Mujic/DeadCellsLocalCoop) (this write-up, local couch co-op); [DeadCellsMultiplayerMod](https://github.com/vaiserYT/DeadCellsMultiplayerMod) (online, separate project) |
 | QA level | none (manual playtests by the owner, no automated harness yet) |
-| Last updated | 2026-10-27 |
+| Last updated | 2026-10-30 |
 
 ## Where things stand
 
 Two players on one PC with two controllers can play a run together: two real heroes with their own health, flasks,
 gear, mutations, scrolls and HUD, a shared camera, down/revive, and loot doubled for the second player. The owner
 played version 0.6.0 from the start of a run to the Bank and called it "fully playable from beginning to end with
-minor issues". Versions 0.7.x and 0.8.0 fix the bugs from that run but were not played yet.
+minor issues". Version 0.9.0 was played from the start to the Lighthouse (playtest 10); 0.10.0 fixes the ten bugs from that run
+and is not played yet.
 
 ## Existing work
 
@@ -49,6 +50,9 @@ minor issues". Versions 0.7.x and 0.8.0 fix the bugs from that run but were not 
   some counters (Diverse Deck "Watcher" charge, kill count) live in `game.data`. These need per-player handling.
 - **Keys**: doors, teleporters, graves and trigger zones count keys in `game.hero.inventory` only. The mod treats keys
   as a shared key ring (`Inventory.countItemKind/hasItem/removeOne` also see the partner's keys).
+- **DCCM wrapper identity**: DCCM holds a game object's C# wrapper weakly unless the object is marked stateful, so a
+  `ConditionalWeakTable` keyed on wrappers silently forgets entries after a .NET GC. Call
+  `HashlinkObj.MarkStateful()` (or use DCCM's `obj.Meta`) on anything you attach data to (playtest 10).
 - **Tools**: crashlink (bundled with DCCM) disassembles `hlboot.dat`; a full text dump of every function with named call
   targets (about 100 MB) made each bug a grep instead of a decompile. Function indexes (`f@NNNN`) are for v35.
 

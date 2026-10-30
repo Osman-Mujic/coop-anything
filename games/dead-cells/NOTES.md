@@ -236,3 +236,47 @@ Root causes found in bytecode:
   "Co-op controls" (L3 regroup, Back+Start, P2 Start, P1 Back map, revive, loot, keys, F9/F10); Options page with both
   plus toggles (shared camera, keep on screen, loot for both, hide minimap). Text only; controller art later.
 - Layout positions are in window pixels and untested in game; expect a tuning pass from screenshots.
+
+## Playtest 10 (v0.9.0, owner, 2026-10-30): Prisoners' Quarters to the Lighthouse; v0.10.0 fixes
+The side picker and controls page worked (log: "Sides chosen: P1=3", "Screen closed: Controls"). Ten bugs; the log
+(`log_2026-10-30-21-30-57.log`) and six screenshots were read for each one.
+
+Observations (log/screenshots):
+- Selling a copy left another copy for the other player, endlessly: `Loot parity (sold): TPSword left for P2 (#17)`,
+  `#18 left for P1`, `#19..#23 left for P2`; same for Talisman4 (#26..#31).
+- Foresight: screenshots show P1's card at 0/8 or 2/8 while P2's stays 8/8.
+- Death arena: `P2 followed into DeathArena` then only `Regroup (P1 L3)`; no "door closed" line.
+- Controller battery: `Pads: 1 connected. P1=keyboard P2=pad#3` (pad#3 was P1's), then `Pads: 2 connected. P1=pad#5 P2=pad#3`.
+- Lighthouse: `P1 is down at 114,86` ... `revived (partner)` ... down again 4 s later, five cycles.
+
+Root causes (derived from the bytecode dump, function indexes for v35):
+1. **DCCM keeps a game object's C# wrapper only weakly** unless the object is marked stateful
+   (`HashlinkObjManager`: `GCHandleType.WeakTrackResurrection`, strongRef only when `IsStateful`). After a .NET GC
+   the same game object gets a new wrapper, so every `ConditionalWeakTable<wrapper, mark>` loses its entries. This
+   is behind bug 3 (the "this drop is P2's copy" mark vanished) and very likely bug 1 (the "this menu is P2's" mark
+   vanished, so P2's outfit menu acted on P1 and never restored P1's look). Fix: `PinnedTable` calls
+   `HashlinkObj.MarkStateful()` on insert - what DCCM's own `ExtraDataUtils.Meta` does - plus a set of copy addresses.
+2. Foresight: the Watcher wrapper set the charge key to P2's and restored P1's key unconditionally. The hit handler
+   (`DiverseDeckWatcher.onBeforeOwnerApplyAttackResult` f@8522) calls `getCharge` (also wrapped), so the rest of P2's
+   hit ran with P1's key: P1's charge was zeroed, P2's never. Fix: restore the previous value (reentrant).
+4. Life bars: `HUD.updateLifeSize` (f@5325) has 14 callers and reads game.hero's items even for P2's HUD. Fix: in
+   co-op both bars use the game's smallest width (ratio 1.0), re-checked every frame.
+5. Bosses start through entry cinematics that take the triggering hero (`cine.EnterRoomDeathBoss(hero)` and 19 more);
+   only some close a BossDoor. Fix: every entry cinematic brings the partner, again 1.5 s later.
+6. `LegendaryAltar.onActivate` (f@19020) and `TimedItem.onActivate` (f@24882) sell on a long press themselves (not via
+   `ItemDrop.recycle`). Fix: partner copy after a sale from either.
+7. Mausoleum mushrooms (`en.mob.boss.gardener.Mushroom.fixedUpdate` f@9495) test only game.hero; `bounce()` launches
+   game.hero. Fix: same landing test for P2, then `bounce()` as P2.
+8. With one pad left the mod gave it to P2 and put P1 on the keyboard. Fix: P1 keeps their pad; when two are connected
+   again the Choose-your-side screen opens.
+9. Lighthouse ropes are pulleys: `Pulley.trigger_execute` (f@7973) moves game.hero onto the rope (setPosPixel,
+   lockControlsS) and `Pulley.fixedUpdate` carries game.hero. Fix: the pulley runs as whoever triggered it.
+10. A downed P1 is still game.hero, which the Lighthouse climb follows. Fix: a downed body is moved to the partner
+   after the partner is half a screen away for 1 s; a revived player stands up at the reviver's spot with
+   unlockControls, cancelSkillControlLock and 2 s intangible.
+
+Scan for other objects that only check game.hero each frame (87 functions; script in the session, not committed):
+movement-related ones still unchecked: UnstableGround/UnstablePF (crumbling floors), RetractableSpikes,
+BreakableGround/HiddenBlock (secrets), TriggerTrap, VineLadder (reads game.hero's runes only). Unknown which matter.
+
+v0.10.0 built (DLL sha256 529c398e87b8...), installed and hash-checked on the PC. Not played yet.
