@@ -280,3 +280,39 @@ movement-related ones still unchecked: UnstableGround/UnstablePF (crumbling floo
 BreakableGround/HiddenBlock (secrets), TriggerTrap, VineLadder (reads game.hero's runes only). Unknown which matter.
 
 v0.10.0 built (DLL sha256 529c398e87b8...), installed and hash-checked on the PC. Not played yet.
+
+## Audit: objects that only react to player 1 (v0.10.1, before playtest 11)
+Method: in the full bytecode dump, list every function of world objects (`en.inter`, `en.ltrap`, `en.deco`,
+`en.loot`, `en.gr`, `en.bu`, `level`) and of gear (`pow`, `tool.weap`, `tool.skill`, `tool.mainSkills`, `en.pet`)
+that loads `<Game>.hero` (from `Game.ME` or `<entity>._level.game`). 189 world-object functions and 27 gear functions.
+Each was read at the point where the hero is used.
+
+Fixed (gameplay):
+- Crumbling floors/platforms `UnstableGround`/`UnstablePF.fixedUpdate`, breakable tiles `BreakableTile.fixedUpdate`,
+  elevator doors and multi-floor elevators, secret reveals (`HiddenBlock`, `HiddenGroundBlock`, `SecretLever`
+  postUpdate), fire walls (`FireWall.checkTouchOpponents`): the object's update now runs with game.hero = the nearer
+  living player. None of these functions changes level.
+- Retractable spikes `checkHeroPositionInCase` (pure check): asked again for P2.
+- Swinging ball trap `TriggerTrap.fixedUpdate`: touching P2 hit, stunned and bumped game.hero (P1). Now runs as P2
+  when only P2 touches the ball (same distance test as the game).
+- Touch-pickup items (`ItemDrop.fixedUpdate`, items with `enableAutoPick`): only P1 picked them up; a copy reserved
+  for P2 could be auto-picked by P1. Now: copies wait for their owner, other items go to the nearer player.
+- Cursed chest: the curse is applied to game.hero when the chest's timer ends (`CursedChest.onCooldownEnd` ->
+  `Hero.curse`), so P2 opening one cursed P1. Mimic chests target game.hero. Both now use whoever opened the chest.
+- Flip platforms subscribe to P1's `heroSignals.landSignal` only (`FlipPF.init`): P2 landing now flips them too.
+- Skill effects aimed at "Hero" (`SkillCommonEffect.getEntitiesFromTarget`, target id "Hero") went to game.hero:
+  P2's self-buff skills landed on P1. Now run as the skill's owner.
+
+Left alone (cosmetic or harmless), with reason:
+- NPCs (`Npc.fixedUpdate`, merchants, blacksmiths, tailor, collector...): greet, face and talk to P1. Their
+  activation already uses the hero who pressed the button.
+- Prompts and tutorials: `Exit`/`BgDoor`/`BankEntrance` distance prompts, `ForceField` message, `VineLadder` glow,
+  `TriggerTorch`, paintings, lighthouse candles. Teleporter reveal on the map (the minimap is P1's).
+- Level exits and exit cinematics (`ExitTo*Trigger`, `FisherBarqueExit`): P1 leaves, P2 follows; running them as P2
+  could carry P2 as the main hero into the next level.
+- Rare item effects that read game.hero: Pollo power chicken sidekicks (grenades, ice armor), blueprint checks
+  (Katana, FaceFlask), Heal perk tier, throwable ammo auto-recovery, `HiddenBlock.onDie` affix bonus, door opening
+  direction, `CardLockedDoor` tp-item reset.
+- Not checked: background doors (`ConditionalZDoor`, `ChallengeZDoor`, `TumulusAntichamberZDoor`) open only near P1.
+
+v0.10.1 built (DLL sha256 527864a9c4e9...), installed and hash-checked on the PC. Not played yet.
