@@ -316,3 +316,25 @@ Left alone (cosmetic or harmless), with reason:
 - Not checked: background doors (`ConditionalZDoor`, `ChallengeZDoor`, `TumulusAntichamberZDoor`) open only near P1.
 
 v0.10.1 built (DLL sha256 527864a9c4e9...), installed and hash-checked on the PC. Not played yet.
+
+## Curses and Malaise at higher difficulties (v0.10.2, owner request; not played, the owners play 0 BC)
+Observations (bytecode, v35; callers of `Hero.curse` and every `Infection` function):
+- Curses are per hero (`Hero.curseCounter`). The skull caster (`en.mob.Curser`, bullet hit callback f@27910) and the
+  Jinx (`CursingSkill.tryHitEntities` f@27998) curse the hero they hit: correct for P2.
+  `AnathemaProjectile.tryApplyCurse` is a player weapon cursing its own owner (`parent`): correct.
+- A dying mob lowers the curse of every cursed, targetable hero (`Mob.onDie` -> `Hero.reduceCurse(1)`), so a kill by
+  either player lifts one step from both cursed players; a downed (untargetable) player's curse doesn't drop.
+- Sore Loser (`SoreLooser.tryToPreventDeath` f@21122): killed by a hero, pet, turret or the head, it cursed
+  game.hero (3 stacks) - P1, whoever killed it. **Fixed**: the killer is found from the attack source (owner
+  through `Entity.parent`, else the mob's `lastHitHero`) and cursed instead.
+- Malaise ("infection" in the code) is ONE meter for the run: `game.data.heroInfection` / `game.data.infectionTier`;
+  the tier switches on game-wide enemy rules (`pr.Infection`). It is capped at the max. Hits on either player add
+  (`HeroAttackTarget.postHitResultUpdate` -> `addInfection`); each kill lowers it once (`Mob.reduceHeroInfection`,
+  through game.hero).
+- But each hero runs its own timer (`Hero.updateInfection` f@2155, from `Hero.fixedUpdate`), both adding to the one
+  meter: in co-op it filled from time about twice as fast as solo. Owner chose **solo speed**: only P1's timer adds;
+  P2's update just refreshes P2's HUD bar.
+- `Mob.reduceHeroInfection` does nothing while game.hero is dead: with P1 down, P2's kills didn't lower Malaise.
+  **Fixed**: runs as P2 then.
+
+v0.10.2 built (DLL sha256 90d6170bf065...), installed and hash-checked on the PC. Not played yet.
