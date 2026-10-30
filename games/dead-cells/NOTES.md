@@ -338,3 +338,14 @@ Observations (bytecode, v35; callers of `Hero.curse` and every `Infection` funct
   **Fixed**: runs as P2 then.
 
 v0.10.2 built (DLL sha256 90d6170bf065...), installed and hash-checked on the PC. Not played yet.
+
+## Teleporter at the screen edge (owner report, v0.10.3)
+Observation (owner): P1 at the far left next to a teleporter, P2 at the far right; P1 used it and "got stuck for a
+few seconds" while P1's model tried to get near it. No bug followed.
+Derived (bytecode): `cine.Teleportation` (f@16312) locks the hero's controls for 2.5 s and slides them to the
+teleporter (`hero.dx = (teleporter x - hero x) * 0.03`); the jump is on a timer. The mod's keep-both-on-screen rule
+(`HoldAtEdge`) cancels outward velocity at the edge, so the slide was blocked and P1 jittered until the timer fired.
+Scripted walks (`GameCinematic.heroWalkUntil`) give up after 2 s by default, so this can't soft-lock, but scenes
+end with the hero short of where they expect. Fix: the edge rule skips a hero while a cinematic runs or the hero's
+controls are locked (`Game.hasCinematic()`, `Hero.controlsLocked`). v0.10.3, DLL sha256 035d0b0b825e..., installed
+and hash-checked; not played.
