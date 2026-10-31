@@ -349,3 +349,33 @@ Scripted walks (`GameCinematic.heroWalkUntil`) give up after 2 s by default, so 
 end with the hero short of where they expect. Fix: the edge rule skips a hero while a cinematic runs or the hero's
 controls are locked (`Game.hasCinematic()`, `Hero.controlsLocked`). v0.10.3, DLL sha256 035d0b0b825e..., installed
 and hash-checked; not played.
+
+## Playtest 11 (v0.10.3, owner, 2026-10-31): Prisoners' Quarters to the Lighthouse, then quit and continue
+Log `log_2026-10-31-15-25-35.log` and the DCCM crash report were read. Loot copies worked all run (12 "P1 took it",
+5 "P2 took it", 23 "sold", no chains). Six bugs:
+1. P2's head throw (R3) used P1's head. 2. P2's new head style appeared on P1 and P2 had no head.
+   Cause (both, and the old "P2 has no visible head"): `HeroHead.init` (f@2194) sets `head.hero = game.hero`; P2's
+   head is initialised outside P2's turn, so it followed P1. The thrown head (`en.Homunculus`) also reads game.hero in
+   nine functions and takes its controls from `Boot.ME.controller` (P1's pad, `initGfx`).
+   Fix: P2's head initialises as P2; the thrown head runs as `sourceSkill.hero` and gets a P2 controller access.
+3. P2 bought an item, no copy for P1: by design until now (shop buys were never copied after playtest 9's
+   duplication). Owner wants copies. Fix: a booth purchase leaves the partner a copy once it is paid for (the pick is
+   deferred until the booth's item changes, so declining still leaves nothing).
+4. Pollo power turned P1 into the chicken: `PolloPower.init` keeps `pHero = game.hero`; it is an entity spawned by
+   `BeheadedActiveSkillsManager.spawnPowerSkill`. Fix: spawns run as the skill manager's hero.
+5. Calliope (the wrecking-ball sister, `en.mob.AmazonSurvival`) stuck, took no damage. `AmazonBase.insideRoom`
+   (f@7011) counts a sister as in the room only inside game.hero's room; it gates activation and
+   `AmazonBase.applyAttackResult`. `AmazonManager` keeps `hero = game.hero` from `init`. With P1 in another room the
+   sister froze. Fix: either living player's room counts; sisters run as the nearer player; the manager follows the
+   player who is higher up; their death checks run as the attacker.
+6. Quit to title + Continue duplicated P1 (with P2's abilities), more each time; using a skill crashed the game.
+   Cause: heroes are saved as ordinary level entities (`Level.registerEntity` -> `savedEntities`,
+   `Entity.shouldSave` = true; `Game.hero` is a separate saved reference). P2 was restored as an unmanaged hero bound
+   to P1's controller (`Hero.init`), and the mod spawned a new P2 (a copy of P1's saved data: "items=48"). The copies
+   fired their skills on P1's button presses; a copy's Foresight had no HUD (`PassivePower.kill` null access, crash).
+   The mod's own clean-up also failed (`HeroHead.dispose` null access, from bug 2).
+   Fix: on Continue the saved Beheaded is taken back as P2 (own items, P2 controller, head rebound, redrawn, HUD);
+   other extra Beheaded heroes are removed. Skipped while game.hero is not a Beheaded (Richter sections).
+
+v0.11.0 built (DLL sha256 45dbcc34d90d...), installed and hash-checked on the PC. Not played yet. The owners' current
+save may hold several copies; the first found becomes P2 (unknown which), so a new run is the clean test.
