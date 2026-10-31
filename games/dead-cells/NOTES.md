@@ -379,3 +379,39 @@ Log `log_2026-10-31-15-25-35.log` and the DCCM crash report were read. Loot copi
 
 v0.11.0 built (DLL sha256 45dbcc34d90d...), installed and hash-checked on the PC. Not played yet. The owners' current
 save may hold several copies; the first found becomes P2 (unknown which), so a new run is the clean test.
+
+## Playtest 12 (v0.11.0, owner, 2026-10-31): Lighthouse again
+Log `log_2026-10-31-19-26-16.log` was read (v0.11.0). Confirmed in it: Continue took the saved P2 back
+("Player 2 restored from the save (49 items ...); 0 extra hero(es) removed"), the boss doors brought P1 through
+twice, no duplicate heroes. Two reports:
+1. The first sister still took no damage (boss bar full, both players next to her; owner thinks P2 went through the
+   door first). Observed in the bytecode (v35):
+   - `AmazonManager.fixedUpdate` (f@7166, ops 535-588) sets `noChase` every frame when `manager.hero` stands in a
+     `CustomEntity` marker `noChaseBelow` of the room it tracks.
+   - With `noChase` (ops 3048-3181) every active sister gets a 99999 s cooldown key 1048576000 and
+     `tpAwayFromHero(0.1, forced, false)`; the function then returns early. `tpAwayFromHero` (f@7032) sets
+     `tpAwayFromHeroBool`, stops her animation on its last frame, interrupts her skills.
+   - Key 1048576000 blocks all damage (`AmazonBase.applyAttackResult` f@7033) and her teleport back
+     (`AmazonBase.fixedUpdate` f@7021, which only teleports her back when game.hero is more than 50 cells away).
+   - Only the fight start removes it (`activateDeactivateAmazonsBossRoom` f@7169, ops 572-727: tpAwayFromHeroBool
+     false, removes keys 1042284544, 2548039680, 1048576000, 2550136832, hasFight true, `tpInsideBossRoom(0.1)`), for
+     the sister whose fight starts.
+   Derived: solo the hero is locked in the arena once a fight starts, so this never happens mid-fight. In co-op the
+   manager followed P1, or (v0.11.0) the player more than 2 cells higher; with that player in a no-chase spot while
+   the other fought, the sister stayed locked for the rest of the fight. That matches both reports (11: "stuck, would
+   not move or take damage"; 12: "cannot hit her"). Not observed: which player was where; unknown where the
+   `noChaseBelow` markers are in the Lighthouse rooms.
+   Fix (v0.11.1): the manager follows the player the sisters should chase (outside a no-chase spot beats inside, then
+   in a boss room beats outside, then the higher player, kept until the other is clearly higher). A sister mid-fight
+   (hasFight, inBossFight) in a boss room with a player in it, noChase off, who still has key 1048576000 after 0.5 s,
+   is put back the way the fight start does it. Blocked hits on a sister are logged with her state (every 5 s at most).
+2. Frostbite (`P_ColdDmg`, P1's mutation) damaged enemies that P2 froze. Observed: `Entity.fixedUpdate` (f@950,
+   ops 1824-1933) gives Frostbite damage to any enemy with affect 23 or 133 (frozen, chilled) when game.hero has
+   `P_ColdDmg`, scaled by game.hero's tier. Superconductor (`ASP_Superconductor`, ops 909-1025) works the same way for
+   affect 91. Nothing records who froze or shocked the enemy (scan of `setAffectS` callers). Derived: P1's Frostbite
+   burning P2's frozen enemies is the mutation's own rule (solo it burns any frozen enemy); the bug is that P2's
+   Frostbite and Superconductor never did anything. Fix (v0.11.1): when only P2 has one of them, a frozen/chilled (or
+   shocked) enemy's `Entity.fixedUpdate` runs as P2. Either player's mutation counts; with both it applies once (P1's
+   tier). A per-freezer rule would need affect ownership the game does not have.
+
+v0.11.1 built (DLL sha256 2af01747...), installed and hash-checked on the PC. Not played yet.
